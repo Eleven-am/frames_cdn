@@ -97,6 +97,8 @@ export abstract class CloudDrive {
 
     abstract setConfig(env: Env): void;
 
+    abstract getRootFolder(env: Env): string;
+
     protected makeRequest<DataType>(url: string, options: RequestInit) {
         return new Promise<DataType | null>((resolve) => {
             fetch(url, options)
@@ -147,6 +149,7 @@ export interface Env {
     DROPBOX_CLIENT_ID: string;
     DROPBOX_CLIENT_SECRET: string;
     GOOGLE_CLIENT_SECRET: string;
+    GOOGLE_ROOT_FOLDER: string;
     BASE_URL: string;
 }
 

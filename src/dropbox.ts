@@ -265,10 +265,14 @@ class DropBox extends CloudDrive {
             redirectUri: `${env.BASE_URL}/dropbox/oauth2callback`,
         };
     }
+
+    getRootFolder(env: Env): string {
+        return "";
+    }
 }
 
 const dropBox = new DropBox();
 
-const routerObject = createRouter(dropBox, '', 'dropbox');
+const routerObject = createRouter(dropBox, 'dropbox');
 export default routerObject.driveRouter;
 export const isDropboxAuthenticated = routerObject.isDriveAuthenticated;

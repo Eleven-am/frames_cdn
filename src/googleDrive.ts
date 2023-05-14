@@ -219,11 +219,14 @@ class GoogleDrive extends CloudDrive {
             redirectUri: `${env.BASE_URL}/google/oauth2callback`,
         };
     }
+
+    getRootFolder(env: Env): string {
+        return env.GOOGLE_ROOT_FOLDER;
+    }
 }
 
 const googleDrive = new GoogleDrive();
-const rootFolder = '1uuidcLK89xhkV6o6m2JwyfGK7tmFnmq8';
 
-const routerObject = createRouter(googleDrive, rootFolder, 'google');
+const routerObject = createRouter(googleDrive, 'google');
 export default routerObject.driveRouter;
 export const isGoogleAuthenticated = routerObject.isDriveAuthenticated;

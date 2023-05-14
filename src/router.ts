@@ -97,7 +97,7 @@ function isAuthorized(reader: CloudDrive, request: Request): boolean {
     return true;
 }
 
-export function createRouter (drive: CloudDrive, root: string, basePath: 'google' | 'dropbox') {
+export function createRouter (drive: CloudDrive, basePath: 'google' | 'dropbox') {
     const driveRouter = Router({base: `/${basePath}`});
     const {preflight, corsify: cors} = createCors({
         origins: ['*'],
@@ -144,8 +144,8 @@ export function createRouter (drive: CloudDrive, root: string, basePath: 'google
 
     driveRouter.get('/auth', () => redirect(drive.generateAuthUrl(true)));
 
-    driveRouter.get('/', async () => {
-        const files = await drive.getFiles(root);
+    driveRouter.get('/', async (_, env: Env) => {
+        const files = await drive.getFiles(drive.getRootFolder(env));
 
         drive.token = null;
         return cors(json(files));
