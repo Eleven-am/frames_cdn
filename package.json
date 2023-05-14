@@ -1,0 +1,23 @@
+{
+  "name": "frames_cdn",
+  "version": "0.0.0",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20230419.0",
+    "@types/itty-router-extras": "^0.4.0",
+    "typescript": "^5.0.4",
+    "wrangler": "2.19.0"
+  },
+  "private": true,
+  "scripts": {
+    "start": "wrangler dev --local",
+    "deploy": "wrangler publish",
+    "dev": "wrangler preview --watch"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.328.0",
+    "@aws-sdk/lib-storage": "^3.328.0",
+    "itty-cors": "^0.3.6",
+    "itty-router": "^3.0.12",
+    "itty-router-extras": "^0.4.2"
+  }
+}
