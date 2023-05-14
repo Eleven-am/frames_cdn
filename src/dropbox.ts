@@ -38,18 +38,13 @@ class DropBox extends CloudDrive {
         return this.#parseFile(returnedData);
     }
 
-    generateAuthUrl(state: boolean) {
+    generateAuthUrl() {
         const params = {
             client_id: this.config.clientId,
             redirect_uri: this.config.redirectUri,
             response_type: 'code',
             token_access_type: 'offline',
             scope: 'files.metadata.read files.content.read files.content.write files.metadata.write'
-        }
-
-        if (state) {
-            // @ts-ignore
-            params['state'] = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
         }
 
         return `https://www.dropbox.com/oauth2/authorize?${this.encodeObject(params)}`;
@@ -84,6 +79,7 @@ class DropBox extends CloudDrive {
     }
 
     async getToken(code: string): Promise<TokenResponse | null> {
+        this.token = null;
         const data = {
             code,
             grant_type: 'authorization_code',
@@ -94,14 +90,16 @@ class DropBox extends CloudDrive {
 
         const url = `https://api.dropboxapi.com/oauth2/token?${this.encodeObject(data)}`;
 
-        const token = await this.makeRequest<TokenResponse>(url, {method: 'POST'});
+        const returnedData = await this.makeRequest<TokenResponse>(url, {method: 'POST'});
 
-        if (!token) {
-            return null;
+        if (returnedData) {
+            this.token = {
+                ...returnedData,
+                expires_in: Date.now() + (returnedData.expires_in * 1000)
+            }
         }
 
-        this.token = token;
-        return token;
+        return this.token;
     }
 
     async #authenticate() {
@@ -124,7 +122,10 @@ class DropBox extends CloudDrive {
             return null;
         }
 
-        this.token = token;
+        this.token = {
+            ...token,
+            expires_in: Date.now() + (token.expires_in * 1000)
+        }
         return token;
     }
 

@@ -91,7 +91,7 @@ export abstract class CloudDrive {
 
     abstract getRecursiveFiles(folderId: string): Promise<RecursiveFile[]>;
 
-    abstract generateAuthUrl(state: boolean): string;
+    abstract generateAuthUrl(): string;
 
     abstract getToken(code: string): Promise<TokenResponse | null>;
 

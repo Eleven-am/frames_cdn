@@ -68,7 +68,8 @@ function isAuthorized(reader: CloudDrive, request: Request): boolean {
     }
 
     const url = new URL(request.url);
-    if (url.pathname.includes('kv/read') || url.pathname.includes('auth')) {
+    const acceptedRoutes = ['kv/read', '/download', '/stream', 'auth']
+    if (acceptedRoutes.includes(url.pathname)) {
         return true;
     }
 
@@ -114,15 +115,13 @@ export function createRouter (drive: CloudDrive, basePath: 'google' | 'dropbox')
         drive.setConfig(env);
         const isAuthorised = isAuthorized(drive, request);
         if (!isAuthorised) {
-            return cors(redirect(drive.generateAuthUrl(false)))
+            return cors(redirect(drive.generateAuthUrl()))
         }
     }
 
-    driveRouter.get('/oauth2callback', async (request, env: Env) => {
+    driveRouter.get('/oauth2callback', async (request) => {
         const url = new URL(request.url);
         const code = url.searchParams.get('code');
-        const state = url.searchParams.get('state');
-        const baseurl = env.BASE_URL;
 
         if (!code) {
             return cors(error(400, 'Missing code'));
@@ -134,15 +133,11 @@ export function createRouter (drive: CloudDrive, basePath: 'google' | 'dropbox')
             return cors(error(500, 'Failed to get token'));
         }
 
-        if (state) {
-            const encodedToken = btoa(JSON.stringify(token));
-            return cors(json({token: encodedToken}));
-        }
-
-        return cors(redirect(`${baseurl}/${basePath}`));
+        const encodedToken = btoa(JSON.stringify(token));
+        return cors(json({token: encodedToken}));
     });
 
-    driveRouter.get('/auth', () => redirect(drive.generateAuthUrl(true)));
+    driveRouter.get('/auth', () => redirect(drive.generateAuthUrl()));
 
     driveRouter.get('/', async (_, env: Env) => {
         const files = await drive.getFiles(drive.getRootFolder(env));

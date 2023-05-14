@@ -134,6 +134,8 @@ class GoogleDrive extends CloudDrive {
     }
 
     async getToken(code: string) {
+        this.token = null;
+
         const data = {
             client_id: this.config.clientId,
             client_secret: this.config.clientSecret,
@@ -153,14 +155,16 @@ class GoogleDrive extends CloudDrive {
         const returnedData = await this.makeRequest<TokenResponse>('https://oauth2.googleapis.com/token', options);
 
         if (returnedData) {
-            this.token = returnedData;
-            this.token.expires_in = Date.now() + (this.token.expires_in * 1000);
+            this.token = {
+                ...returnedData,
+                expires_in: Date.now() + (returnedData.expires_in * 1000)
+            }
         }
 
-        return returnedData;
+        return this.token;
     }
 
-    generateAuthUrl(state: boolean) {
+    generateAuthUrl() {
         const params = {
             client_id: this.config.clientId,
             redirect_uri: this.config.redirectUri,
@@ -168,11 +172,6 @@ class GoogleDrive extends CloudDrive {
             scope: 'https://www.googleapis.com/auth/drive.readonly',
             access_type: 'offline',
             prompt: 'consent'
-        }
-
-        if (state) {
-            // @ts-ignore
-            params['state'] = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
         }
 
         return `https://accounts.google.com/o/oauth2/v2/auth?${this.encodeObject(params)}`;
