@@ -1,0 +1,15 @@
+name = "cdn"
+main = "src/index.ts"
+compatibility_date = "2023-05-08"
+
+kv_namespaces = [
+    { binding = "FILES", id = "<YOUR_KV_ID>", preview_id = "<YOUR_KV_ID>" }
+]
+
+[vars]
+GOOGLE_CLIENT_ID = "<YOUR_GOOGLE_CLIENT_ID>"
+GOOGLE_CLIENT_SECRET = "<YOUR_GOOGLE_CLIENT_SECRET>"
+DROPBOX_CLIENT_ID = "<YOUR_DROPBOX_CLIENT_ID>"
+DROPBOX_CLIENT_SECRET = "<YOUR_DROPBOX_CLIENT_SECRET>"
+BASE_URL = "http://localhost:8787" # or your production URL
+
