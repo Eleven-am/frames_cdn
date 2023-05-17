@@ -1,5 +1,5 @@
 import {
-    CloudDrive,
+    CloudDrive, CloudProvider,
     DriveFile,
     Env,
     File,
@@ -7,12 +7,11 @@ import {
     RecursiveFile,
     TokenResponse
 } from "./cloudDrive";
-import {createRouter} from "./router";
 
-class GoogleDrive extends CloudDrive {
+export class GoogleDrive extends CloudDrive {
 
     constructor() {
-        super();
+        super(CloudProvider.GOOGLE);
     }
 
     async getFiles(folderId: string, pageToken?: string) {
@@ -215,7 +214,7 @@ class GoogleDrive extends CloudDrive {
         this.config = {
             clientId: env.GOOGLE_CLIENT_ID,
             clientSecret: env.GOOGLE_CLIENT_SECRET,
-            redirectUri: `${env.BASE_URL}/google/oauth2callback`,
+            redirectUri: `${env.BASE_URL}/${CloudProvider.GOOGLE}/oauth2callback`,
         };
     }
 
@@ -223,9 +222,3 @@ class GoogleDrive extends CloudDrive {
         return env.GOOGLE_ROOT_FOLDER;
     }
 }
-
-const googleDrive = new GoogleDrive();
-
-const routerObject = createRouter(googleDrive, 'google');
-export default routerObject.driveRouter;
-export const isGoogleAuthenticated = routerObject.isDriveAuthenticated;

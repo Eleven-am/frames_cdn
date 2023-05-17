@@ -1,3 +1,5 @@
+import {IRequest} from "itty-router";
+
 export interface File {
     fileName: string;
     isFolder: boolean;
@@ -54,21 +56,32 @@ export interface DropBoxFile {
 
 export type Cors = (response: Response) => Response;
 
+export enum CloudProvider {
+    DROPBOX = 'dropbox',
+    GOOGLE = 'google',
+}
+
 export abstract class CloudDrive {
     #token: TokenResponse | null;
     #config: DriveOptions | null;
+    readonly #provider: CloudProvider;
 
-    protected constructor() {
+    protected constructor(provider: CloudProvider) {
         this.#token = null;
         this.#config = null;
+        this.#provider = provider;
+    }
+
+    get token() {
+        return this.#token;
     }
 
     set token(token: TokenResponse | null) {
         this.#token = token;
     }
 
-    get token() {
-        return this.#token;
+    get provider() {
+        return this.#provider;
     }
 
     protected get config(): DriveOptions {
@@ -154,7 +167,12 @@ export interface Env {
 }
 
 export interface KVMessage {
-    type: 'dropbox' | 'google';
+    type: CloudProvider;
     fileId: string;
     token: TokenResponse;
+    inline: boolean;
 }
+
+export type DriveRequest = IRequest & {
+    drive: CloudDrive;
+};

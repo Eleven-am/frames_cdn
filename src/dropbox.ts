@@ -1,5 +1,6 @@
 import {
     CloudDrive,
+    CloudProvider,
     DropBoxFile,
     DropBoxGetFilesResponse,
     Env,
@@ -7,12 +8,11 @@ import {
     RecursiveFile,
     TokenResponse
 } from "./cloudDrive";
-import {createRouter} from "./router";
 
-class DropBox extends CloudDrive {
+export class DropBox extends CloudDrive {
 
     constructor() {
-        super();
+        super(CloudProvider.DROPBOX);
     }
 
     async getFile(fileId: string) {
@@ -114,9 +114,9 @@ class DropBox extends CloudDrive {
             client_secret: this.config.clientSecret,
         }
 
-        const url = `https://api.dropboxapi.com/oauth2/token?${this.encodeObject(data)}`;
+        const url = `https://api.dropbox.com/oauth2/token?${this.encodeObject(data)}`;
 
-        const token = await this.makeRequest<TokenResponse>(url, {method: 'GET'});
+        const token = await this.makeRequest<TokenResponse>(url, {method: 'POST'});
 
         if (!token) {
             return null;
@@ -263,7 +263,7 @@ class DropBox extends CloudDrive {
         this.config = {
             clientId: env.DROPBOX_CLIENT_ID,
             clientSecret: env.DROPBOX_CLIENT_SECRET,
-            redirectUri: `${env.BASE_URL}/dropbox/oauth2callback`,
+            redirectUri: `${env.BASE_URL}/${CloudProvider.DROPBOX}/oauth2callback`,
         };
     }
 
@@ -271,9 +271,3 @@ class DropBox extends CloudDrive {
         return "";
     }
 }
-
-const dropBox = new DropBox();
-
-const routerObject = createRouter(dropBox, 'dropbox');
-export default routerObject.driveRouter;
-export const isDropboxAuthenticated = routerObject.isDriveAuthenticated;

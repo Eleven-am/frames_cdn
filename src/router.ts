@@ -1,11 +1,26 @@
 import {
-    CloudDrive, Cors, Env,
-    KVMessage, TokenResponse,
+    CloudDrive,
+    CloudProvider,
+    Cors,
+    DriveRequest,
+    Env,
+    KVMessage,
+    TokenResponse
 } from "./cloudDrive";
-
-import {Router} from "itty-router";
+import {DropBox} from "./dropbox";
+import {GoogleDrive} from "./googleDrive";
 import {createCors} from "itty-cors";
-import {error, json, missing} from 'itty-router-extras';
+import {error, json, missing} from "itty-router-extras";
+import {IRequest, Router} from "itty-router";
+
+export const {preflight, corsify: cors} = createCors({
+    origins: ['*'],
+    maxAge: 3600,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    headers: {
+        'x-powered-by': 'cloudDrive-CDN',
+    }
+})
 
 function uuid (): string {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
@@ -21,47 +36,27 @@ function redirect(url: string): Response {
     return Response.redirect(url, 302)
 }
 
-async function saveToken(env: Env, message: KVMessage) {
-    const randomId = uuid();
-    await env.FILES.put(randomId, JSON.stringify(message), {expirationTtl: 5 * 60 * 60});
-
-    return randomId;
-}
-
-async function getToken(env: Env, fileId: string): Promise<KVMessage | null> {
-    const token = await env.FILES.get<KVMessage>(fileId, 'json');
-    if (token === null) {
-        return null;
+function getProvider (provider: string, env: Env): CloudDrive | null {
+    let drive: CloudDrive | null = null;
+    switch (provider) {
+        case CloudProvider.DROPBOX:
+            drive = new DropBox();
+            break;
+        case CloudProvider.GOOGLE:
+            drive = new GoogleDrive();
+            break;
+        default:
+            return null;
     }
 
-    return token;
-}
-
-function stream(res: Response, mimeType: string, cors: Cors): Response {
-    if (!res.ok) {
-        return cors(error(res.status, res.statusText));
+    if (drive !== null) {
+        drive.setConfig(env);
     }
 
-    const {headers} = res = new Response(res.body, res);
-    headers.set('Content-Disposition', 'inline');
-    headers.set('Content-Type', mimeType);
-
-    return cors(res);
+    return drive;
 }
 
-function download(res: Response, mimeType: string, cors: Cors): Response {
-    if (!res.ok) {
-        return cors(error(res.status, res.statusText));
-    }
-
-    const {headers} = res = new Response(res.body, res);
-    headers.set('Content-Disposition', 'attachment');
-    headers.set('Content-Type', mimeType);
-
-    return cors(res);
-}
-
-function isAuthorized(reader: CloudDrive, request: Request): boolean {
+function isAuthorized(reader: CloudDrive, request: IRequest): boolean {
     const token = reader.token;
     if (token !== null) {
         return true;
@@ -98,28 +93,84 @@ function isAuthorized(reader: CloudDrive, request: Request): boolean {
     return true;
 }
 
-export function createRouter (drive: CloudDrive, basePath: 'google' | 'dropbox') {
-    const driveRouter = Router({base: `/${basePath}`});
-    const {preflight, corsify: cors} = createCors({
-        origins: ['*'],
-        maxAge: 3600,
-        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-        headers: {
-            'x-powered-by': 'cloudDrive-CDN',
-        }
-    })
+export function isDriveAuthenticated(request: IRequest, env: Env) {
+    const url = new URL(request.url);
+    const provider = url.pathname.split('/')[1];
 
-    // @ts-ignore
-    driveRouter.all('*', preflight);
-    function isDriveAuthenticated(request: Request, env: Env) {
-        drive.setConfig(env);
-        const isAuthorised = isAuthorized(drive, request);
-        if (!isAuthorised) {
-            return cors(redirect(drive.generateAuthUrl()))
-        }
+    if (provider === null) {
+        return cors(error(400, 'Missing provider'));
     }
 
-    driveRouter.get('/oauth2callback', async (request) => {
+    const drive = getProvider(provider, env);
+
+    if (drive === null) {
+        return cors(error(400, 'Invalid provider'));
+    }
+
+    drive.setConfig(env);
+    const isAuthorised = isAuthorized(drive, request);
+    if (!isAuthorised) {
+        return cors(redirect(drive.generateAuthUrl()))
+    }
+
+    request.drive = drive;
+}
+
+async function saveToken(env: Env, message: KVMessage) {
+    const randomId = uuid();
+    await env.FILES.put(randomId, JSON.stringify(message), {expirationTtl: 5 * 60 * 60});
+
+    return randomId;
+}
+
+async function getToken(env: Env, fileId: string) {
+    const message = await env.FILES.get<KVMessage>(fileId, 'json');
+    if (message === null) {
+        return null;
+    }
+
+    const reader = getProvider(message.type, env);
+
+    if (reader === null) {
+        return null;
+    }
+
+    reader.token = message.token;
+    return {reader, message};
+}
+
+function stream(res: Response, mimeType: string, cors: Cors): Response {
+    if (!res.ok) {
+        return cors(error(res.status, res.statusText));
+    }
+
+    const {headers} = res = new Response(res.body, res);
+    headers.set('Content-Disposition', 'inline');
+    headers.set('Content-Type', mimeType);
+
+    return cors(res);
+}
+
+function download(res: Response, mimeType: string, cors: Cors): Response {
+    if (!res.ok) {
+        return cors(error(res.status, res.statusText));
+    }
+
+    const {headers} = res = new Response(res.body, res);
+    headers.set('Content-Disposition', 'attachment');
+    headers.set('Content-Type', mimeType);
+
+    return cors(res);
+}
+
+export function createRouter (basePath: CloudProvider) {
+    const router = Router({base: `/${basePath}`});
+
+    // @ts-ignore
+    router.all('*', preflight);
+
+    // @ts-ignore
+    router.get('/oauth2callback', async (request: DriveRequest) => {
         const url = new URL(request.url);
         const code = url.searchParams.get('code');
 
@@ -127,7 +178,7 @@ export function createRouter (drive: CloudDrive, basePath: 'google' | 'dropbox')
             return cors(error(400, 'Missing code'));
         }
 
-        const token = await drive.getToken(code);
+        const token = await request.drive.getToken(code);
 
         if (!token) {
             return cors(error(500, 'Failed to get token'));
@@ -137,16 +188,19 @@ export function createRouter (drive: CloudDrive, basePath: 'google' | 'dropbox')
         return cors(json({token: encodedToken}));
     });
 
-    driveRouter.get('/auth', () => redirect(drive.generateAuthUrl()));
+    // @ts-ignore
+    router.get('/auth', (request: DriveRequest) => redirect(request.drive.generateAuthUrl()));
 
-    driveRouter.get('/', async (_, env: Env) => {
+    // @ts-ignore
+    router.get('/', async ({drive}: DriveRequest, env: Env) => {
         const files = await drive.getFiles(drive.getRootFolder(env));
 
         drive.token = null;
         return cors(json(files));
     });
 
-    driveRouter.get('/:path', async ({params}) => {
+    // @ts-ignore
+    router.get('/:path', async ({params, drive}: DriveRequest) => {
         const parent = await drive.getFile(params.path);
         const files = await drive.getFiles(params.path);
 
@@ -154,7 +208,8 @@ export function createRouter (drive: CloudDrive, basePath: 'google' | 'dropbox')
         return cors(json({parent, files}));
     });
 
-    driveRouter.get('/:path/recursive',async ({params}) => {
+    // @ts-ignore
+    router.get('/:path/recursive',async ({params, drive}: DriveRequest) => {
         const parent = await drive.getFile(params.path);
         const files = await drive.getRecursiveFiles(params.path);
 
@@ -162,7 +217,8 @@ export function createRouter (drive: CloudDrive, basePath: 'google' | 'dropbox')
         return cors(json({parent, files}));
     });
 
-    driveRouter.get('/file/:id', async ({params}) => {
+    // @ts-ignore
+    router.get('/file/:id', async ({params, drive}: DriveRequest) => {
         const file = await drive.getFile(params.id);
 
         if (!file) {
@@ -173,22 +229,24 @@ export function createRouter (drive: CloudDrive, basePath: 'google' | 'dropbox')
         return cors(json(file));
     });
 
-    driveRouter.get('/file/:id/stream', async request => {
+    // @ts-ignore
+    router.get('/file/:id/stream', async (request: DriveRequest) => {
         const {id} = request.params;
         const range = request.headers.get('range');
 
-        const file = await drive.getFile(id);
+        const file = await request.drive.getFile(id);
         if (!file) {
             return cors(missing());
         }
 
-        let res = await drive.getRawFile(id, range);
+        let res = await request.drive.getRawFile(id, range);
 
-        drive.token = null;
+        request.drive.token = null;
         return stream(res, file.mimeType, cors);
     });
 
-    driveRouter.get('/file/:id/download', async ({params}) => {
+    // @ts-ignore
+    router.get('/file/:id/download', async ({params, drive}: DriveRequest) => {
         const file = await drive.getFile(params.id);
         if (!file) {
             return cors(missing());
@@ -200,8 +258,13 @@ export function createRouter (drive: CloudDrive, basePath: 'google' | 'dropbox')
         return download(res, file.fileName, cors);
     });
 
-    driveRouter.get('/kv/write/:id', async ({params}, env: Env) => {
+    // @ts-ignore
+    router.get('/kv/write/:id', async (request: DriveRequest, env: Env) => {
+        const params = request.params;
+        const drive = request.drive;
         const file = await drive.getFile(params.id);
+        const notInline = request.query.download === 'true';
+
         if (!file) {
             return cors(missing());
         }
@@ -219,7 +282,8 @@ export function createRouter (drive: CloudDrive, basePath: 'google' | 'dropbox')
         const message: KVMessage = {
             fileId: params.id,
             token: token,
-            type: basePath
+            type: basePath,
+            inline: !notInline,
         }
 
         const randomId = await saveToken(env, message);
@@ -228,13 +292,15 @@ export function createRouter (drive: CloudDrive, basePath: 'google' | 'dropbox')
         return cors(json({id: randomId}));
     });
 
-    driveRouter.get('/kv/read/:id', async (request, env: Env) => {
+    /* @ts-ignore
+    router.get('/kv/read/:id', async (request: DriveRequest, env: Env) => {
         const message = await getToken(env, request.params.id);
         if (!message) {
             return cors(missing());
         }
 
-        const {fileId, token, type} = message;
+        const drive = message.reader;
+        const {fileId, token, type} = message.message;
         if (type !== basePath) {
             return cors(error(400, 'Invalid type'));
         }
@@ -251,12 +317,36 @@ export function createRouter (drive: CloudDrive, basePath: 'google' | 'dropbox')
 
         drive.token = null;
         return stream(res, file.mimeType, cors);
-    });
+    });*/
 
-    driveRouter.get('*', () => cors(missing('Invalid endpoint')));
+    router.get('*', () => cors(missing('Invalid endpoint')));
 
-    return {
-        driveRouter,
-        isDriveAuthenticated
+    return router.handle;
+}
+
+export async function handleRead (request: IRequest, env: Env): Promise<Response> {
+    const message = await getToken(env, request.params.uuid);
+    if (!message) {
+        return cors(missing());
     }
+
+    const drive = message.reader;
+    const {fileId, token, inline} = message.message;
+
+    const range = request.headers.get('range');
+
+    drive.token = token;
+    const file = await drive.getFile(fileId);
+    if (!file) {
+        return cors(missing());
+    }
+
+    let res = await drive.getRawFile(fileId, range);
+    drive.token = null;
+
+    if (inline) {
+        return stream(res, file.mimeType, cors);
+    }
+
+    return download(res, file.fileName, cors);
 }
