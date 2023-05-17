@@ -1,7 +1,6 @@
 import {Router} from 'itty-router'
-import {json, missing} from "itty-router-extras";
 import {CloudProvider, Env} from "./cloudDrive";
-import {cors, createRouter, handleRead, isDriveAuthenticated, preflight} from "./router";
+import {cors, createRouter, handleRead, isDriveAuthenticated, json, missing, preflight} from "./router";
 
 const router = Router();
 

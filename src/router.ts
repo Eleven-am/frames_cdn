@@ -9,18 +9,7 @@ import {
 } from "./cloudDrive";
 import {DropBox} from "./dropbox";
 import {GoogleDrive} from "./googleDrive";
-import {createCors} from "itty-cors";
-import {error, json, missing} from "itty-router-extras";
 import {IRequest, Router} from "itty-router";
-
-export const {preflight, corsify: cors} = createCors({
-    origins: ['*'],
-    maxAge: 3600,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    headers: {
-        'x-powered-by': 'cloudDrive-CDN',
-    }
-})
 
 function uuid (): string {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
@@ -34,6 +23,39 @@ function uuid (): string {
 
 function redirect(url: string): Response {
     return Response.redirect(url, 302)
+}
+
+function error(code: number, message: string): Response {
+    return new Response(message, {status: code});
+}
+
+export function cors(response: Response): Response {
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, HEAD, POST, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With, Accept, Range');
+    response.headers.set('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Content-Disposition');
+
+    return response;
+}
+
+export function json(data: any): Response {
+    return new Response(JSON.stringify(data, null, 2), {
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    });
+}
+
+export function missing(message = 'Not Found'): Response {
+    return error(404, message);
+}
+
+export function preflight(request: IRequest): Response | void {
+    if (request.method === 'OPTIONS') {
+        return cors(new Response(null, {
+            status: 204,
+        }));
+    }
 }
 
 function getProvider (provider: string, env: Env): CloudDrive | null {
@@ -166,7 +188,6 @@ function download(res: Response, fileName: string, mimeType: string, cors: Cors)
 export function createRouter (basePath: CloudProvider) {
     const router = Router({base: `/${basePath}`});
 
-    // @ts-ignore
     router.all('*', preflight);
 
     // @ts-ignore
