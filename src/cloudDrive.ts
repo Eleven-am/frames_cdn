@@ -35,8 +35,14 @@ export interface DriveOptions {
 
 export interface TokenResponse {
     access_token: string;
-    expires_in: number;
+    expiry_date: number;
     refresh_token: string;
+}
+
+export interface OauthTokenResponse {
+    access_token: string;
+    refresh_token: string;
+    expires_in: number;
 }
 
 export interface DropBoxGetFilesResponse {

@@ -85,7 +85,7 @@ function isAuthorized(reader: CloudDrive, request: IRequest): boolean {
 
     const decoded = atob(tokenValue);
     const tokenResponse = JSON.parse(decoded) as TokenResponse;
-    if (tokenResponse.access_token === undefined || tokenResponse.expires_in === undefined || tokenResponse.refresh_token === undefined) {
+    if (tokenResponse.access_token === undefined || tokenResponse.expiry_date === undefined || tokenResponse.refresh_token === undefined) {
         return false;
     }
 

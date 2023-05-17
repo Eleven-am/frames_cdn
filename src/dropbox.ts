@@ -2,11 +2,10 @@ import {
     CloudDrive,
     CloudProvider,
     DropBoxFile,
-    DropBoxGetFilesResponse,
+    DropBoxGetFilesResponse, OauthTokenResponse,
     Env,
     File,
     RecursiveFile,
-    TokenResponse
 } from "./cloudDrive";
 
 export class DropBox extends CloudDrive {
@@ -78,7 +77,7 @@ export class DropBox extends CloudDrive {
         return this.#retrieveFiles(folderId, true);
     }
 
-    async getToken(code: string): Promise<TokenResponse | null> {
+    async getToken(code: string) {
         this.token = null;
         const data = {
             code,
@@ -90,12 +89,13 @@ export class DropBox extends CloudDrive {
 
         const url = `https://api.dropboxapi.com/oauth2/token?${this.encodeObject(data)}`;
 
-        const returnedData = await this.makeRequest<TokenResponse>(url, {method: 'POST'});
+        const returnedData = await this.makeRequest<OauthTokenResponse>(url, {method: 'POST'});
 
         if (returnedData) {
             this.token = {
-                ...returnedData,
-                expires_in: Date.now() + (returnedData.expires_in * 1000)
+                access_token: returnedData.access_token,
+                refresh_token: returnedData.refresh_token,
+                expiry_date: Date.now() + (returnedData.expires_in * 1000)
             }
         }
 
@@ -103,7 +103,7 @@ export class DropBox extends CloudDrive {
     }
 
     async #authenticate() {
-        if (this.token && this.token.expires_in > Date.now()) {
+        if (this.token && this.token.expiry_date > Date.now()) {
             return;
         }
 
@@ -116,15 +116,16 @@ export class DropBox extends CloudDrive {
 
         const url = `https://api.dropbox.com/oauth2/token?${this.encodeObject(data)}`;
 
-        const token = await this.makeRequest<TokenResponse>(url, {method: 'POST'});
+        const token = await this.makeRequest<OauthTokenResponse>(url, {method: 'POST'});
 
         if (!token) {
             return null;
         }
 
         this.token = {
-            ...token,
-            expires_in: Date.now() + (token.expires_in * 1000)
+            access_token: token.access_token,
+            refresh_token: token.refresh_token,
+            expiry_date: Date.now() + (token.expires_in * 1000)
         }
         return token;
     }

@@ -1,11 +1,10 @@
 import {
     CloudDrive, CloudProvider,
-    DriveFile,
+    DriveFile, OauthTokenResponse,
     Env,
     File,
     ListFilesResponse,
     RecursiveFile,
-    TokenResponse
 } from "./cloudDrive";
 
 export class GoogleDrive extends CloudDrive {
@@ -151,12 +150,13 @@ export class GoogleDrive extends CloudDrive {
             }
         }
 
-        const returnedData = await this.makeRequest<TokenResponse>('https://oauth2.googleapis.com/token', options);
+        const returnedData = await this.makeRequest<OauthTokenResponse>('https://oauth2.googleapis.com/token', options);
 
         if (returnedData) {
             this.token = {
-                ...returnedData,
-                expires_in: Date.now() + (returnedData.expires_in * 1000)
+                access_token: returnedData.access_token,
+                refresh_token: returnedData.refresh_token,
+                expiry_date: Date.now() + (returnedData.expires_in * 1000)
             }
         }
 
@@ -177,7 +177,7 @@ export class GoogleDrive extends CloudDrive {
     }
 
     async #authenticate() {
-        if (this.token && this.token.expires_in > Date.now()) {
+        if (this.token && this.token.expiry_date > Date.now()) {
             return;
         }
 
@@ -196,15 +196,12 @@ export class GoogleDrive extends CloudDrive {
             },
         }
 
-        const returnedData = await this.makeRequest<{
-            access_token: string
-            refresh_token: string
-        }>('https://www.googleapis.com/oauth2/v4/token', options);
+        const returnedData = await this.makeRequest<OauthTokenResponse>('https://www.googleapis.com/oauth2/v4/token', options);
 
         if (returnedData) {
             this.token = {
                 access_token: returnedData.access_token,
-                expires_in: 3600 * 1000 + Date.now(),
+                expiry_date: Date.now() + (returnedData.expires_in * 1000),
                 refresh_token: this.token?.refresh_token || returnedData.refresh_token,
             }
         }
