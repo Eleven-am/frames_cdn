@@ -202,6 +202,14 @@ export function createRouter (basePath: CloudProvider) {
     // @ts-ignore
     router.get('/:path', async ({params, drive}: DriveRequest) => {
         const parent = await drive.getFile(params.path);
+        if (parent === null) {
+            return cors(missing());
+        }
+
+        if (!parent.isFolder) {
+            return cors(error(400, 'Not a folder'));
+        }
+
         const files = await drive.getFiles(params.path);
 
         drive.token = null;
@@ -211,6 +219,14 @@ export function createRouter (basePath: CloudProvider) {
     // @ts-ignore
     router.get('/:path/recursive',async ({params, drive}: DriveRequest) => {
         const parent = await drive.getFile(params.path);
+        if (parent === null) {
+            return cors(missing());
+        }
+
+        if (!parent.isFolder) {
+            return cors(error(400, 'Not a folder'));
+        }
+
         const files = await drive.getRecursiveFiles(params.path);
 
         drive.token = null;
@@ -223,6 +239,10 @@ export function createRouter (basePath: CloudProvider) {
 
         if (!file) {
             return cors(missing());
+        }
+
+        if (file.isFolder) {
+            return cors(error(400, 'Not a file'));
         }
 
         drive.token = null;
@@ -239,6 +259,10 @@ export function createRouter (basePath: CloudProvider) {
             return cors(missing());
         }
 
+        if (file.isFolder) {
+            return cors(error(400, 'Not a file'));
+        }
+
         let res = await request.drive.getRawFile(id, range);
 
         request.drive.token = null;
@@ -250,6 +274,10 @@ export function createRouter (basePath: CloudProvider) {
         const file = await drive.getFile(params.id);
         if (!file) {
             return cors(missing());
+        }
+
+        if (file.isFolder) {
+            return cors(error(400, 'Not a file'));
         }
 
         let res = await drive.getRawFile(params.id);
@@ -312,6 +340,10 @@ export async function handleRead (request: IRequest, env: Env): Promise<Response
     const file = await drive.getFile(fileId);
     if (!file) {
         return cors(missing());
+    }
+
+    if (file.isFolder) {
+        return cors(error(400, 'Not a file'));
     }
 
     let res = await drive.getRawFile(fileId, range);
