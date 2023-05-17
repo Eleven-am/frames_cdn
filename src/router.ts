@@ -63,7 +63,7 @@ function isAuthorized(reader: CloudDrive, request: IRequest): boolean {
     }
 
     const url = new URL(request.url);
-    const acceptedRoutes = ['kv/read', '/download', '/stream', 'auth']
+    const acceptedRoutes = ['/download', '/stream', 'auth']
     if (acceptedRoutes.includes(url.pathname)) {
         return true;
     }
@@ -151,13 +151,13 @@ function stream(res: Response, mimeType: string, cors: Cors): Response {
     return cors(res);
 }
 
-function download(res: Response, mimeType: string, cors: Cors): Response {
+function download(res: Response, fileName: string, mimeType: string, cors: Cors): Response {
     if (!res.ok) {
         return cors(error(res.status, res.statusText));
     }
 
     const {headers} = res = new Response(res.body, res);
-    headers.set('Content-Disposition', 'attachment');
+    headers.set('Content-Disposition', `attachment; filename="${fileName}"`);
     headers.set('Content-Type', mimeType);
 
     return cors(res);
@@ -255,7 +255,7 @@ export function createRouter (basePath: CloudProvider) {
         let res = await drive.getRawFile(params.id);
 
         drive.token = null;
-        return download(res, file.fileName, cors);
+        return download(res, file.fileName, file.mimeType, cors);
     });
 
     // @ts-ignore
@@ -292,33 +292,6 @@ export function createRouter (basePath: CloudProvider) {
         return cors(json({id: randomId}));
     });
 
-    /* @ts-ignore
-    router.get('/kv/read/:id', async (request: DriveRequest, env: Env) => {
-        const message = await getToken(env, request.params.id);
-        if (!message) {
-            return cors(missing());
-        }
-
-        const drive = message.reader;
-        const {fileId, token, type} = message.message;
-        if (type !== basePath) {
-            return cors(error(400, 'Invalid type'));
-        }
-
-        const range = request.headers.get('range');
-
-        drive.token = token;
-        const file = await drive.getFile(fileId);
-        if (!file) {
-            return cors(missing());
-        }
-
-        let res = await drive.getRawFile(fileId, range);
-
-        drive.token = null;
-        return stream(res, file.mimeType, cors);
-    });*/
-
     router.get('*', () => cors(missing('Invalid endpoint')));
 
     return router.handle;
@@ -348,5 +321,5 @@ export async function handleRead (request: IRequest, env: Env): Promise<Response
         return stream(res, file.mimeType, cors);
     }
 
-    return download(res, file.fileName, cors);
+    return download(res, file.fileName, file.mimeType, cors);
 }
