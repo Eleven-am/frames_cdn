@@ -13,6 +13,7 @@
     "dev": "wrangler preview --watch"
   },
   "dependencies": {
-    "itty-router": "^3.0.12"
+    "itty-router": "4.0.13",
+    "zod": "^3.21.4"
   }
 }

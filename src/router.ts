@@ -1,7 +1,6 @@
 import {
     CloudDrive,
     CloudProvider,
-    Cors,
     DriveRequest,
     Env,
     KVMessage,
@@ -21,14 +20,6 @@ function uuid (): string {
         });
 }
 
-function redirect(url: string): Response {
-    return Response.redirect(url, 302)
-}
-
-function error(code: number, message: string): Response {
-    return new Response(message, {status: code});
-}
-
 export function cors(response: Response): Response {
     response.headers.set('Access-Control-Allow-Origin', '*');
     response.headers.set('Access-Control-Allow-Methods', 'GET, HEAD, POST, OPTIONS');
@@ -38,12 +29,23 @@ export function cors(response: Response): Response {
     return response;
 }
 
+function redirect(url: string): Response {
+    return Response.redirect(url, 302)
+}
+export function error(code: number, message: string): Response {
+    const response = new Response(message, {status: code});
+
+    return cors(response);
+}
+
 export function json(data: any): Response {
-    return new Response(JSON.stringify(data, null, 2), {
+    const response = new Response(JSON.stringify(data, null, 2), {
         headers: {
             'Content-Type': 'application/json',
         },
     });
+
+    return cors(response);
 }
 
 export function missing(message = 'Not Found'): Response {
@@ -120,19 +122,19 @@ export function isDriveAuthenticated(request: IRequest, env: Env) {
     const provider = url.pathname.split('/')[1];
 
     if (provider === null) {
-        return cors(error(400, 'Missing provider'));
+        return error(400, 'Missing provider');
     }
 
     const drive = getProvider(provider, env);
 
     if (drive === null) {
-        return cors(error(400, 'Invalid provider'));
+        return error(400, 'Invalid provider');
     }
 
     drive.setConfig(env);
     const isAuthorised = isAuthorized(drive, request);
     if (!isAuthorised) {
-        return cors(redirect(drive.generateAuthUrl()))
+        return redirect(drive.generateAuthUrl());
     }
 
     request.drive = drive;
@@ -161,9 +163,9 @@ async function getToken(env: Env, fileId: string) {
     return {reader, message};
 }
 
-function stream(res: Response, mimeType: string, cors: Cors): Response {
+function stream(res: Response, mimeType: string): Response {
     if (!res.ok) {
-        return cors(error(res.status, res.statusText));
+        return error(res.status, res.statusText);
     }
 
     const {headers} = res = new Response(res.body, res);
@@ -173,9 +175,9 @@ function stream(res: Response, mimeType: string, cors: Cors): Response {
     return cors(res);
 }
 
-function download(res: Response, fileName: string, mimeType: string, cors: Cors): Response {
+function download(res: Response, fileName: string, mimeType: string): Response {
     if (!res.ok) {
-        return cors(error(res.status, res.statusText));
+        return error(res.status, res.statusText);
     }
 
     const {headers} = res = new Response(res.body, res);
@@ -196,17 +198,17 @@ export function createRouter (basePath: CloudProvider) {
         const code = url.searchParams.get('code');
 
         if (!code) {
-            return cors(error(400, 'Missing code'));
+            return error(400, 'Missing code');
         }
 
         const token = await request.drive.getToken(code);
 
         if (!token) {
-            return cors(error(500, 'Failed to get token'));
+            return error(500, 'Failed to get token');
         }
 
         const encodedToken = btoa(JSON.stringify(token));
-        return cors(json({token: encodedToken}));
+        return json({token: encodedToken});
     });
 
     // @ts-ignore
@@ -217,41 +219,41 @@ export function createRouter (basePath: CloudProvider) {
         const files = await drive.getFiles(drive.getRootFolder(env));
 
         drive.token = null;
-        return cors(json(files));
+        return json(files);
     });
 
     // @ts-ignore
     router.get('/:path', async ({params, drive}: DriveRequest) => {
         const parent = await drive.getFile(params.path);
         if (parent === null) {
-            return cors(missing());
+            return missing();
         }
 
         if (!parent.isFolder) {
-            return cors(error(400, 'Not a folder'));
+            return error(400, 'Not a folder');
         }
 
         const files = await drive.getFiles(params.path);
 
         drive.token = null;
-        return cors(json({parent, files}));
+        return json({parent, files});
     });
 
     // @ts-ignore
     router.get('/:path/recursive',async ({params, drive}: DriveRequest) => {
         const parent = await drive.getFile(params.path);
         if (parent === null) {
-            return cors(missing());
+            return missing();
         }
 
         if (!parent.isFolder) {
-            return cors(error(400, 'Not a folder'));
+            return error(400, 'Not a folder');
         }
 
         const files = await drive.getRecursiveFiles(params.path);
 
         drive.token = null;
-        return cors(json({parent, files}));
+        return json({parent, files});
     });
 
     // @ts-ignore
@@ -259,15 +261,15 @@ export function createRouter (basePath: CloudProvider) {
         const file = await drive.getFile(params.id);
 
         if (!file) {
-            return cors(missing());
+            return missing();
         }
 
         if (file.isFolder) {
-            return cors(error(400, 'Not a file'));
+            return error(400, 'Not a file');
         }
 
         drive.token = null;
-        return cors(json(file));
+        return json(file);
     });
 
     // @ts-ignore
@@ -277,34 +279,34 @@ export function createRouter (basePath: CloudProvider) {
 
         const file = await request.drive.getFile(id);
         if (!file) {
-            return cors(missing());
+            return missing();
         }
 
         if (file.isFolder) {
-            return cors(error(400, 'Not a file'));
+            return error(400, 'Not a file');
         }
 
         let res = await request.drive.getRawFile(id, range);
 
         request.drive.token = null;
-        return stream(res, file.mimeType, cors);
+        return stream(res, file.mimeType);
     });
 
     // @ts-ignore
     router.get('/file/:id/download', async ({params, drive}: DriveRequest) => {
         const file = await drive.getFile(params.id);
         if (!file) {
-            return cors(missing());
+            return missing();
         }
 
         if (file.isFolder) {
-            return cors(error(400, 'Not a file'));
+            return error(400, 'Not a file');
         }
 
         let res = await drive.getRawFile(params.id);
 
         drive.token = null;
-        return download(res, file.fileName, file.mimeType, cors);
+        return download(res, file.fileName, file.mimeType);
     });
 
     // @ts-ignore
@@ -315,17 +317,17 @@ export function createRouter (basePath: CloudProvider) {
         const notInline = request.query.download === 'true';
 
         if (!file) {
-            return cors(missing());
+            return missing();
         }
 
         if (file.isFolder) {
-            return cors(error(400, 'Cannot write folder'));
+            return error(400, 'Cannot write folder');
         }
 
         const token = drive.token;
 
         if (!token) {
-            return cors(error(500, 'Failed to get token'));
+            return error(500, 'Failed to get token');
         }
 
         const message: KVMessage = {
@@ -338,10 +340,10 @@ export function createRouter (basePath: CloudProvider) {
         const randomId = await saveToken(env, message);
 
         drive.token = null;
-        return cors(json({id: randomId}));
+        return json({id: randomId});
     });
 
-    router.get('*', () => cors(missing('Invalid endpoint')));
+    router.get('*', () => missing('Invalid endpoint'));
 
     return router.handle;
 }
@@ -349,7 +351,7 @@ export function createRouter (basePath: CloudProvider) {
 export async function handleRead (request: IRequest, env: Env): Promise<Response> {
     const message = await getToken(env, request.params.uuid);
     if (!message) {
-        return cors(missing());
+        return missing();
     }
 
     const drive = message.reader;
@@ -360,19 +362,19 @@ export async function handleRead (request: IRequest, env: Env): Promise<Response
     drive.token = token;
     const file = await drive.getFile(fileId);
     if (!file) {
-        return cors(missing());
+        return missing();
     }
 
     if (file.isFolder) {
-        return cors(error(400, 'Not a file'));
+        return error(400, 'Not a file');
     }
 
     let res = await drive.getRawFile(fileId, range);
     drive.token = null;
 
     if (inline) {
-        return stream(res, file.mimeType, cors);
+        return stream(res, file.mimeType);
     }
 
-    return download(res, file.fileName, file.mimeType, cors);
+    return download(res, file.fileName, file.mimeType);
 }

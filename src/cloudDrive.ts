@@ -60,8 +60,6 @@ export interface DropBoxFile {
     size: number;
 }
 
-export type Cors = (response: Response) => Response;
-
 export enum CloudProvider {
     DROPBOX = 'dropbox',
     GOOGLE = 'google',
@@ -169,6 +167,7 @@ export interface Env {
     DROPBOX_CLIENT_SECRET: string;
     GOOGLE_CLIENT_SECRET: string;
     GOOGLE_ROOT_FOLDER: string;
+    EMAIL_TOKEN: string;
     BASE_URL: string;
 }
 
