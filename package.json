@@ -2,9 +2,9 @@
   "name": "frames_cdn",
   "version": "0.0.0",
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20230419.0",
-    "typescript": "^5.0.4",
-    "wrangler": "2.19.0"
+    "@cloudflare/workers-types": "^4.20240320.1",
+    "typescript": "^5.4.3",
+    "wrangler": "3.41.0"
   },
   "private": true,
   "scripts": {
@@ -13,7 +13,7 @@
     "dev": "wrangler preview --watch"
   },
   "dependencies": {
-    "itty-router": "4.0.13",
-    "zod": "^3.21.4"
+    "itty-router": "5.0.4",
+    "zod": "^3.22.4"
   }
 }
